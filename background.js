@@ -139,7 +139,7 @@ window.addEventListener("load", () => {
 
             ctx.beginPath();
             ctx.lineWidth = 2;
-            ctx.strokeStyle = "#4A5D46";
+            ctx.strokeStyle = "#020202";
             ctx.moveTo(origin.x, origin.y);
             this.vertices.forEach(([vx, vy]) => {
                 ctx.lineTo(vx, vy);
