@@ -1,0 +1,158 @@
+const LINE_DENSITY = 0.05;
+const LINE_SPEED = 45;
+const LINE_SEGMENT = 10;
+const LINE_SEGMENT_COUNT_MAX = 70;
+const LINE_SEGMENT_COUNT_VARIANCE = 10;
+
+let allEnded = false;
+let animating = false;
+let lines = [];
+
+window.addEventListener("load", () => {
+    const canvas = document.getElementById("backgroundCanvas");
+    canvas.addEventListener("click", (e) => {
+        const vertical = Math.random() > 0.5;
+        lines.push(new Line(e.pageX, e.pageY, vertical ? [0, 1] : [1, 0]));
+        lines.push(new Line(e.pageX, e.pageY, vertical ? [0, -1] : [-1, 0]));
+        lines.push(new Line(e.pageX, e.pageY, vertical ? [1, 0] : [0, -1]));
+        if (!animating) {
+            allEnded = false;
+            animating = true;
+            animate();
+        }
+    });
+    const ctx = canvas.getContext("2d");
+
+    const resizeCanvas = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        lines = [];
+        generateLines();
+        if (animating) return;
+        animating = true;
+        allEnded = false;
+        animate();
+    };
+
+    const generateLines = () => {
+        const lateralLines = Math.floor(canvas.height * 2 * LINE_DENSITY);
+        const verticalLines = Math.floor(canvas.width * 2 * LINE_DENSITY);
+
+        for (let i = 0; i < lateralLines; i++) {
+            if (i < lateralLines / 2) {
+                const x = 0;
+                const y = (i / lateralLines) * 2 * canvas.height;
+                const direction = [1, 0];
+                lines.push(new Line(x, y, direction));
+            } else {
+                const x = canvas.width;
+                const y = ((i - lateralLines / 2) / lateralLines) * 2 * canvas.height;
+                const direction = [-1, 0];
+                lines.push(new Line(x, y, direction));
+            }
+        }
+
+        for (let i = 0; i < verticalLines; i++) {
+            if (i < verticalLines / 2) {
+                const x = (i / verticalLines) * 2 * canvas.width;
+                const y = 0;
+                const direction = [0, 1];
+                lines.push(new Line(x, y, direction));
+            } else {
+                const x = ((i - verticalLines / 2) / verticalLines) * 2 * canvas.width;
+                const y = canvas.height;
+                const direction = [0, -1];
+                lines.push(new Line(x, y, direction));
+            }
+        }
+    };
+
+    let lastTime = 0;
+    let deltaTime = 0;
+
+    function animate(time) {
+        deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        if (!allEnded) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            allEnded = true;
+            lines.forEach((line) => {
+                allEnded = allEnded && line.end;
+                line.draw(deltaTime);
+            });
+            requestAnimationFrame(animate);
+        } else {
+            animating = false;
+        }
+    }
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    function Line(x, y, directionIntent) {
+        const origin = {
+            x: x,
+            y: y,
+        };
+
+        this.x = x;
+        this.y = y;
+        this.segmentProgress = 0;
+        this.vertices = [];
+        this.direction = directionIntent;
+        this.end = false;
+
+        const proportionalSegmentCount = Math.min(
+            Math.floor(canvas.width / 14),
+            LINE_SEGMENT_COUNT_MAX,
+        );
+        this.segmentCount =
+            proportionalSegmentCount +
+            Math.round(
+                Math.random() * LINE_SEGMENT_COUNT_VARIANCE -
+                LINE_SEGMENT_COUNT_VARIANCE / 2,
+            );
+
+        this.newSegment = () => {
+            this.vertices.push([this.x, this.y]);
+
+            if (this.direction[1] === 0) {
+                this.direction = [0, Math.random() > 0.5 ? 1 : -1];
+            } else {
+                this.direction = [Math.random() > 0.5 ? 1 : -1, 0];
+            }
+        };
+
+        this.draw = (delta) => {
+            if (!this.end && !isNaN(delta))
+                this.segmentProgress += LINE_SPEED * delta;
+
+            while (this.segmentProgress >= LINE_SEGMENT) {
+                this.x += this.direction[0] * LINE_SEGMENT;
+                this.y += this.direction[1] * LINE_SEGMENT;
+                this.newSegment();
+                this.segmentProgress -= LINE_SEGMENT;
+            }
+
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#4A5D46";
+            ctx.moveTo(origin.x, origin.y);
+            this.vertices.forEach(([vx, vy]) => {
+                ctx.lineTo(vx, vy);
+            });
+
+            const px = this.x + this.direction[0] * this.segmentProgress;
+            const py = this.y + this.direction[1] * this.segmentProgress;
+            ctx.lineTo(px, py);
+            ctx.stroke();
+
+            if (this.vertices.length >= this.segmentCount) {
+                this.end = true;
+            }
+        };
+    }
+});
